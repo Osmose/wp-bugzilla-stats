@@ -104,7 +104,6 @@ class BugzillaStatisticsService {
 
         // TODO: Handle redirects explicitly
         $response = curl_exec($this->curl_handle);
-        echo curl_error($this->curl_handle);
         return xmlrpc_decode($response);
     }
 }
