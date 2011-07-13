@@ -44,14 +44,22 @@ License: MPL
  * the terms of any one of the MPL, the GPL or the LGPL.
  *
  * ***** END LICENSE BLOCK ***** */
-require('class.BugzillaStatisticsService.php');
+require_once('class.BugzillaStatisticsService.php');
 
-$bugzilla_stats_options = get_option('bzstats_options');
+$bugzilla_stats_options = get_option('bzstats_settings');
 $bugzilla_stats_service = false;
 if ($bugzilla_stats_options !== false) {
     $bugzilla_stats_service = new BugzillaStatisticsService($bugzilla_stats_options['bugzilla_url']);
 }
 
+/**
+ * Retrieves Bugzilla statistics for the given user. Uses a local cache updated
+ * based on an admin-specified delay.
+ *
+ * @param int $user_id ID of Wordpress user to update
+ * @param string $user_email Email address of Bugzilla user
+ * @return array Statistics for the given email
+ */
 function get_bugzilla_stats_for_user($user_email) {
     global $bugzilla_stats_service, $bugzilla_stats_options;
     if ($bugzilla_stats_service === false) return false;
@@ -69,6 +77,14 @@ function get_bugzilla_stats_for_user($user_email) {
     return $stats;
 }
 
+/**
+ * Retrieves the latest statistics from Bugzilla and updates
+ * the local cache with them.
+ *
+ * @param int $user_id ID of Wordpress user to update
+ * @param string $user_email Email address of Bugzilla user
+ * @return array Statistics for the given email
+ */
 function update_bugzilla_stats_for_user($user_id, $user_email) {
     global $bugzilla_stats_service;
     if ($bugzilla_stats_service === false) return false;
@@ -84,45 +100,18 @@ function update_bugzilla_stats_for_user($user_id, $user_email) {
  * Admin Settings Page
  */
 
-function bzstats_options_validate($input) {
-    $newinput = array();
-    $newinput['bugzilla_url'] = filter_var($input['bugzilla_url'], FILTER_SANITIZE_URL);
-    $newinput['delay'] = (int) $input['delay'];
-
-    return $newinput;
-}
-
-function bzstats_url_input() {
-    $options = get_option('bzstats_options');
-?>
-<input name="bzstats_options[bugzilla_url]" size="40" type="text"
-       value="<?php echo $options['bugzilla_url']; ?>" />
-<span class="description">E.g. https://bugzilla.mozilla.org</span>
-<?php
-}
-
-function bzstats_delay_input() {
-    $options = get_option('bzstats_options');
-?>
-<input name="bzstats_options[delay]" size="8" type="text" value="<?php echo $options['delay']; ?>" />
-<?php
-}
-
-function bzstats_section_text() {
-    echo '<p>Bugzilla Stats connection settings.</p>';
-}
-
 add_action('admin_menu', 'bzstats_admin_menu');
+add_action('admin_init', 'bzstats_admin_init');
+
 function bzstats_admin_menu() {
     add_options_page('Bugzilla Stats Settings', 'Bugzilla Stats',
                      'manage_options', 'bugzilla-stats-settings',
-                     'bzstats_options');
+                     'bzstats_settings');
 }
 
-add_action('admin_init', 'bzstats_admin_init');
 function bzstats_admin_init() {
-    register_setting('bzstats_options', 'bzstats_options',
-                     'bzstats_options_validate');
+    register_setting('bzstats_settings', 'bzstats_settings',
+                     'bzstats_settings_validate');
 
     add_settings_section('bzstats_main', 'Main Settings', 'bzstats_section_text', 'bzstats');
     add_settings_field('bzstats_url', 'Bugzilla URL',
@@ -131,15 +120,42 @@ function bzstats_admin_init() {
                        'bzstats_delay_input', 'bzstats', 'bzstats_main');
 }
 
-function bzstats_options() {
+function bzstats_settings_validate($input) {
+    $newinput = array();
+    $newinput['bugzilla_url'] = esc_url_raw($input['bugzilla_url'], array('http', 'https'));
+    $newinput['delay'] = (int) $input['delay'];
+
+    return $newinput;
+}
+
+function bzstats_url_input() {
+    $settings = get_option('bzstats_settings');
+?>
+<input id="bzstats_url" name="bzstats_settings[bugzilla_url]" size="40" type="text" value="<?php echo $settings['bugzilla_url']; ?>" />
+<span class="description">E.g. https://bugzilla.mozilla.org</span>
+<?php
+}
+
+function bzstats_delay_input() {
+    $settings = get_option('bzstats_settings');
+?>
+<input id="bzstats_delay" name="bzstats_settings[delay]" size="8" type="text" value="<?php echo $settings['delay']; ?>" />
+<?php
+}
+
+function bzstats_section_text() {
+    echo '<p>Bugzilla Stats connection settings.</p>';
+}
+
+function bzstats_settings() {
     if (!current_user_can('manage_options'))  {
-        wp_die( __('You do not have sufficient permissions to access this page.') );
+        wp_die(__('You do not have sufficient permissions to access this page.'));
     }
 ?>
 <div class="wrap">
   <h2>Bugzilla Stats Configuration</h2>
   <form action="options.php" method="post">
-    <?php settings_fields('bzstats_options'); ?>
+    <?php settings_fields('bzstats_settings'); ?>
     <?php do_settings_sections('bzstats'); ?>
 
     <p class="submit">
