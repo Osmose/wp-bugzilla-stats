@@ -73,7 +73,8 @@ class BugzillaStatisticsService {
     public function get_user_stats($user_email) {
         try {
             return array(
-                'bug_count' => $this->get_user_bug_count($user_email)
+                'bug_count' => $this->get_user_bug_count($user_email),
+                'recent_bug_count' => $this->get_user_recent_bug_count($user_email)
             );
         } catch (Exception $e) {
             return array(
@@ -89,6 +90,21 @@ class BugzillaStatisticsService {
     public function get_user_bug_count($user_email) {
         $search_params = array(
             'creator' => $user_email
+        );
+
+        $search_result = $this->bugzilla_call('Bug.search', $search_params);
+        return count($search_result['bugs']);
+    }
+
+    /**
+     * Uses WebService::Bug::Search to count the number of bugs created
+     * by a user within the last 30 days.
+     */
+    public function get_user_recent_bug_count($user_email) {
+        $date = date('Y-m-d\TH:i:s', strtotime('-1 months'));
+        $search_params = array(
+            'creator' => $user_email,
+            'creation_time' => $date
         );
 
         $search_result = $this->bugzilla_call('Bug.search', $search_params);
