@@ -49,7 +49,12 @@ require_once('class.BugzillaStatisticsService.php');
 $bugzilla_stats_options = get_option('bzstats_settings');
 $bugzilla_stats_service = false;
 if ($bugzilla_stats_options !== false) {
-    $bugzilla_stats_service = new BugzillaStatisticsService($bugzilla_stats_options['bugzilla_url']);
+    // More than 10 seconds per request is painful
+    $bugzilla_stats_service = new BugzillaStatisticsService(
+        $bugzilla_stats_options['bugzilla_url'], array(
+            CURLOPT_TIMEOUT => 10
+        )
+    );
 }
 
 /**
@@ -58,7 +63,7 @@ if ($bugzilla_stats_options !== false) {
  *
  * @param int $user_id ID of Wordpress user to update
  * @param string $user_email Email address of Bugzilla user
- * @return array Statistics for the given email
+ * @return array|boolean Statistics for the given email or false on error
  */
 function get_bugzilla_stats_for_user($user_email) {
     global $bugzilla_stats_service, $bugzilla_stats_options;
@@ -71,7 +76,12 @@ function get_bugzilla_stats_for_user($user_email) {
 
     $stats = get_user_meta($user->ID, 'bugzilla_stats', true);
     if (($stats === false) || ($stats['updated_at'] + $bugzilla_stats_options['delay'] < $curtime)) {
-        $stats = update_bugzilla_stats_for_user($user->ID, $user->user_email);
+        $new_stats = update_bugzilla_stats_for_user($user->ID, $user->user_email);
+
+        // If there's an error, fall back to old stats. Otherwise, replace with new stats
+        if ($new_stats) {
+            $stats = $new_stats;
+        }
     }
 
     return $stats;
@@ -83,15 +93,21 @@ function get_bugzilla_stats_for_user($user_email) {
  *
  * @param int $user_id ID of Wordpress user to update
  * @param string $user_email Email address of Bugzilla user
- * @return array Statistics for the given email
+ * @return array|boolean Statistics for the given email or false on error
  */
 function update_bugzilla_stats_for_user($user_id, $user_email) {
     global $bugzilla_stats_service;
     if ($bugzilla_stats_service === false) return false;
 
     $stats = $bugzilla_stats_service->get_user_stats($user_email);
-    $stats['updated_at'] = time();
-    update_user_meta($user_id, 'bugzilla_stats', $stats);
+
+    // Only update if there was no error
+    if (!array_key_exists('error', $stats)) {
+        $stats['updated_at'] = time();
+        update_user_meta($user_id, 'bugzilla_stats', $stats);
+    } else {
+        $stats = false;
+    }
 
     return $stats;
 }

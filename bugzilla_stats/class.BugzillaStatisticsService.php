@@ -50,7 +50,7 @@ class BugzillaStatisticsService {
      * @param array $custom_options Array of custom cURL options to override
      *                              defaults
      */
-    function __construct($bugzilla_url) {
+    function __construct($bugzilla_url, $custom_options = array()) {
         $this->curl_handle = curl_init();
         $options = array(
             CURLOPT_URL => $bugzilla_url . '/xmlrpc.cgi',
@@ -63,6 +63,7 @@ class BugzillaStatisticsService {
         );
 
         curl_setopt_array($this->curl_handle, $options);
+        curl_setopt_array($this->curl_handle, $custom_options);
     }
 
     function __destruct() {
@@ -70,9 +71,15 @@ class BugzillaStatisticsService {
     }
 
     public function get_user_stats($user_email) {
-        return array(
-            'bug_count' => $this->get_user_bug_count($user_email)
-        );
+        try {
+            return array(
+                'bug_count' => $this->get_user_bug_count($user_email)
+            );
+        } catch (Exception $e) {
+            return array(
+                'error' => $e->getMessage()
+            );
+        }
     }
 
     /**
@@ -104,6 +111,11 @@ class BugzillaStatisticsService {
 
         // TODO: Handle redirects explicitly
         $response = curl_exec($this->curl_handle);
+        if ($response == false) {
+            throw new Exception("Bugzilla request failed: (" . curl_errno($this->curl_handle) . ") "
+                                . curl_error($this->curl_handle));
+        }
+
         return xmlrpc_decode($response);
     }
 }
