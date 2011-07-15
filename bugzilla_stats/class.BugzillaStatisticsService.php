@@ -70,19 +70,6 @@ class BugzillaStatisticsService {
         curl_close($this->curl_handle);
     }
 
-    public function get_user_stats($user_email) {
-        try {
-            return array(
-                'bug_count' => $this->get_user_bug_count($user_email),
-                'recent_bug_count' => $this->get_user_recent_bug_count($user_email)
-            );
-        } catch (Exception $e) {
-            return array(
-                'error' => $e->getMessage()
-            );
-        }
-    }
-
     /**
      * Uses WebService::Bug::Search to count the number of bugs created
      * by a user.

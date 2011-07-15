@@ -77,8 +77,8 @@ function get_bugzilla_stats_for_user($user_email) {
     if (($stats === false) || ($stats['updated_at'] + $bugzilla_stats_options['delay'] < $curtime)) {
         $new_stats = update_bugzilla_stats_for_user($user->ID, $user->user_email);
 
-        // If there's an error, fall back to old stats. Otherwise, replace with new stats
-        if ($new_stats) {
+        // If there'a no error, use the new stats, otherwise fall back to old stats
+        if ($new_stats !== false) {
             $stats = $new_stats;
         }
     }
@@ -98,13 +98,15 @@ function update_bugzilla_stats_for_user($user_id, $user_email) {
     global $bugzilla_stats_service;
     if ($bugzilla_stats_service === false) return false;
 
-    $stats = $bugzilla_stats_service->get_user_stats($user_email);
+    try {
+        $stats = array(
+            'bug_count' => $bugzilla_stats_service->get_user_bug_count($user_email),
+            'recent_bug_count' => $bugzilla_stats_service->get_user_recent_bug_count($user_email),
+            'updated_at' => time()
+        );
 
-    // Only update if there was no error
-    if (!array_key_exists('error', $stats)) {
-        $stats['updated_at'] = time();
         update_user_meta($user_id, 'bugzilla_stats', $stats);
-    } else {
+    } catch (Exception $e) {
         $stats = false;
     }
 
