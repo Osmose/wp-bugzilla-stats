@@ -1,12 +1,6 @@
 # Wordpress Bugzilla Stats
 
-**In Development, Use at your own Risk**
-
 Provides two functions for retrieving statistics about a Bugzilla user. This can be used to add Bugzilla statistics to a Wordpress user profile page.
-
-The following statistics are available:
-
-* Bugs Created
 
 ## Installation
 
@@ -16,14 +10,17 @@ The following statistics are available:
 
 ## Usage
 
-The `get_bugzilla_stats_for_user` function takes an email address its argument and returns an array containing the following data:
+```
+$stats = get_bugzilla_stats_for_user('my@email.com');
+```
 
-* `$result['updated_at']`: Timestamp when the statistics were last updated.
-* `$result['bug_count']`: Total amount of bugs the user has created.
+* `$stats['updated_at']`: Timestamp when the statistics were last updated.
+* `$stats['bug_count']`: Total amount of bugs the user has created.
+* `$stats['recent_bug_count']`: Amount of bugs created in the last month.
 
-If an invalid email address is given, the function returns `false`.
+If an invalid email address is given, `$stats = false`.
 
-The `update_bugzilla_stats_for_user` function returns the same value, but will update the database cache regardless of how much time has passed since the last update.
+`update_bugzilla_stats_for_user` functions equivalently, except that it does not use the cache and will always query Bugzilla.
 
 ## License
 
