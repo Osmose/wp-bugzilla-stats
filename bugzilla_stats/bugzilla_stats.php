@@ -44,6 +44,8 @@ License: MPL
  * the terms of any one of the MPL, the GPL or the LGPL.
  *
  * ***** END LICENSE BLOCK ***** */
+error_reporting(E_ALL);
+ini_set('display_errors', '1');
 require_once('class.BugzillaStatisticsService.php');
 
 $bugzilla_stats_options = get_option('bzstats_settings');
@@ -57,29 +59,35 @@ if ($bugzilla_stats_options !== false) {
 }
 
 /**
- * Retrieves Bugzilla statistics for the given user. Uses a local cache updated
- * based on an admin-specified delay.
+ * Retrieves Bugzilla statistics for the given Wordpress user. Data is cached
  *
- * @param int $user_id ID of Wordpress user to update
- * @param string $user_email Email address of Bugzilla user
- * @return array|boolean Statistics for the given email or false on error
+ * @param string $user User object returned from get_userdata
+ * @return array Statistics for the given email
+ *
+ * @uses update_bugzilla_stats_for_user
  */
-function get_bugzilla_stats_for_user($user_email) {
-    global $bugzilla_stats_service, $bugzilla_stats_options;
-    if ($bugzilla_stats_service === false) return false;
-
+function get_bugzilla_stats_for_user($user) {
+    global $bugzilla_stats_options;
     $curtime = time();
 
-    $user = get_user_by_email($user_email);
-    if ($user === false) return false;
+    // Default delay is 24 hours
+    $delay = 60 * 60 * 24;
+    if (isset($bugzilla_stats_options['delay'])) {
+        $delay = $bugzilla_stats_options['delay'];
+    }
 
+    // Check the cache (if any) against the stored invalidation time
     $stats = get_user_meta($user->ID, 'bugzilla_stats', true);
-    if (($stats === false) || ($stats['updated_at'] + $bugzilla_stats_options['delay'] < $curtime)) {
-        $new_stats = update_bugzilla_stats_for_user($user->ID, $user->user_email);
-
-        // If there'a no error, use the new stats, otherwise fall back to old stats
-        if ($new_stats !== false) {
-            $stats = $new_stats;
+    if (($stats === "") || ($stats['updated_at'] + $delay < $curtime)) {
+        try {
+            $stats = get_bugzilla_stats_for_email($user->user_email);
+            $stats['updated_at'] = $curtime;
+            update_user_meta($user->ID, 'bugzilla_stats', $stats);
+        } catch (Exception $e) {
+            // Pass exception up only if there's no cache
+            if ($stats === "") {
+                throw $e;
+            }
         }
     }
 
@@ -87,31 +95,44 @@ function get_bugzilla_stats_for_user($user_email) {
 }
 
 /**
- * Retrieves the latest statistics from Bugzilla and updates
- * the local cache with them.
+ * Retrieves the latest statistics from Bugzilla for the given email.
  *
- * @param int $user_id ID of Wordpress user to update
  * @param string $user_email Email address of Bugzilla user
- * @return array|boolean Statistics for the given email or false on error
+ * @return array Statistics for the given email
+ *
+ * @throws BugzillaConnectionException An error has occurred connecting to Bugzilla
+ * @throws BugzillaUserNotFoundException The specified email was not found in Bugzilla
  */
-function update_bugzilla_stats_for_user($user_id, $user_email) {
-    global $bugzilla_stats_service;
-    if ($bugzilla_stats_service === false) return false;
+function get_bugzilla_stats_for_email($user_email) {
+    $service = bzstats_get_service();
 
-    try {
-        $stats = array(
-            'bug_count' => $bugzilla_stats_service->get_user_bug_count($user_email),
-            'recent_bug_count' => $bugzilla_stats_service->get_user_recent_bug_count($user_email),
-            'updated_at' => time()
-        );
-
-        update_user_meta($user_id, 'bugzilla_stats', $stats);
-    } catch (Exception $e) {
-        $stats = false;
+    if (!$service->check_user_exists($user_email)) {
+        throw new BugzillaUserNotFoundException("No bugzilla user was found with email: {$user_email}");
     }
+
+    $stats = array(
+        'bug_count' => $service->get_user_bug_count($user_email),
+        'recent_bug_count' => $service->get_user_recent_bug_count($user_email),
+        'updated_at' => time()
+    );
 
     return $stats;
 }
+
+function bzstats_get_service() {
+    global $bugzilla_stats_service;
+
+    if ($bugzilla_stats_service === false) {
+        throw new BugzillaConnectionException("No service URL configured.");
+    }
+
+    return $bugzilla_stats_service;
+}
+
+/*
+ * Exceptions
+ */
+class BugzillaUserNotFoundException extends Exception { }
 
 /*
  * Admin Settings Page

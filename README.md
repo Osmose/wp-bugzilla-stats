@@ -1,26 +1,38 @@
 # Wordpress Bugzilla Stats
 
-Provides two functions for retrieving statistics about a Bugzilla user. This can be used to add Bugzilla statistics to a Wordpress user profile page.
+Provides functions for retrieving statistics about a Bugzilla user. This can be used to add Bugzilla statistics to a Wordpress user profile page.
 
 ## Installation
 
 1. Copy the `bugzilla_stats` directory to your `wp-content/plugins` directory.
 2. Activate the plugin via the Wordpress admin interface.
-3. Navigate to the `Settings->Bugzilla Stats` page in the Wordpress admin interface and enter the URL for a Bugzilla install and delay time for caching retrieved data.
+3. Navigate to the __Settings->Bugzilla Stats__ page in the Wordpress admin interface and enter the URL for a Bugzilla install and delay time for caching retrieved data.
 
 ## Usage
 
 ```
-$stats = get_bugzilla_stats_for_user('my@email.com');
+// You can also use get_userdata, get_currentuserinfo, or other equivalent functions
+$user = get_user_by_email('user@example.com');
+
+// Will pull from user metadata cache if possible
+$stats = get_bugzilla_stats_for_user($user);
+
+// You can also skip the cache and get stats for *any* Bugzilla user
+$stats = get_buzilla_stats_for_email('user@example.com')
 ```
+
+Results of the above code:
 
 * `$stats['updated_at']`: Timestamp when the statistics were last updated.
 * `$stats['bug_count']`: Total amount of bugs the user has created.
 * `$stats['recent_bug_count']`: Amount of bugs created in the last month.
 
-If an invalid email address is given, `$stats = false`.
+### Error Handling
 
-`update_bugzilla_stats_for_user` functions equivalently, except that it does not use the cache and will always query Bugzilla.
+Both functions will throw exceptions on errors:
+
+* __BugzillaConnectionException__: An error has occurred while connection to Bugzilla.
+* __BugzillaUserNotFoundException__: Thrown when a user cannot be found in Bugzilla.
 
 ## License
 

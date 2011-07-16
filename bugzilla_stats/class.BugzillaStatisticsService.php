@@ -99,6 +99,22 @@ class BugzillaStatisticsService {
     }
 
     /**
+     * Checks whether a user exists in Bugzilla.
+     */
+    public function check_user_exists($user_email) {
+        $search_params = array(
+            'names' => array($user_email),
+        );
+
+        $search_result = $this->bugzilla_call('User.get', $search_params);
+        if (array_key_exists('faultCode', $search_result)) {
+            return false;
+        } else {
+            return true;
+        }
+    }
+
+    /**
      * Calls a function in the Bugzilla XML-RPC API
      */
     private function bugzilla_call($function, $params) {
@@ -115,10 +131,16 @@ class BugzillaStatisticsService {
         // TODO: Handle redirects explicitly
         $response = curl_exec($this->curl_handle);
         if ($response == false) {
-            throw new Exception("Bugzilla request failed: (" . curl_errno($this->curl_handle) . ") "
-                                . curl_error($this->curl_handle));
+            throw new BugzillaConnectionException("Bugzilla request failed: " .
+                                                  "(" . curl_errno($this->curl_handle) . ") " .
+                                                  curl_error($this->curl_handle));
         }
 
         return xmlrpc_decode($response);
     }
 }
+
+/**
+ * Exceptions
+ */
+class BugzillaConnectionException extends Exception { }
