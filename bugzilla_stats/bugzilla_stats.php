@@ -44,8 +44,6 @@ License: MPL
  * the terms of any one of the MPL, the GPL or the LGPL.
  *
  * ***** END LICENSE BLOCK ***** */
-error_reporting(E_ALL);
-ini_set('display_errors', '1');
 require_once('class.BugzillaStatisticsService.php');
 
 $bugzilla_stats_options = get_option('bzstats_settings');
